@@ -33,18 +33,9 @@ The image is published automatically to GitHub Container Registry on every push 
 
 ```sh
 cp config.example.yml config.yml
-cp docker-compose.example.yml docker-compose.yml
 ```
 
-### 2. Edit `docker-compose.yml`
-
-Replace `<your-github-user>` with your GitHub username in the `image:` line:
-
-```yaml
-image: ghcr.io/<your-github-user>/dockboard:latest
-```
-
-### 3. Configure your services
+### 2. Configure your services
 
 Edit `config.yml`:
 
@@ -63,11 +54,11 @@ sections:
         url: http://192.168.1.10:9443
 ```
 
-### 4. Add icons (optional)
+### 3. Add icons (optional)
 
 Drop `.png`, `.svg`, `.jpg` or `.webp` files into the `icons/` folder and reference them by filename in `config.yml`.
 
-### 5. Start
+### 4. Start
 
 ```sh
 docker compose up -d
@@ -145,8 +136,6 @@ Image tags produced:
 | Push to `release` | `latest`, `release` |
 | Tag `v1.2.3` | `1.2.3`, `1.2`, `latest` |
 
-To use your own published image you only need to set `image: ghcr.io/<your-github-user>/dockboard:latest` in your `docker-compose.yml` — no local build required.
-
 ---
 
 ## Project structure
@@ -176,7 +165,7 @@ dockboard/
 │           ├── health.ts         # GET /api/health?url=…
 │           └── icons/[file].ts   # GET /icons/<filename>
 ├── config.example.yml            # ← copy to config.yml
-├── docker-compose.example.yml    # ← copy to docker-compose.yml
+├── docker-compose.yml
 ├── Dockerfile
 └── package.json
 ```
