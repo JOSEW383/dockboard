@@ -1,0 +1,481 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Section from '../components/Section.astro';
+import { loadConfig } from '../lib/config';
+import type { DockboardConfig } from '../lib/config';
+
+let config: DockboardConfig | null = null;
+let loadError = false;
+
+try {
+  config = await loadConfig();
+} catch (err) {
+  console.error('[dockboard] index.astro failed to load config:', err);
+  loadError = true;
+}
+
+const title = config?.title ?? 'Dockboard';
+const subtitle = config?.subtitle;
+const favicon = config?.icon;
+const interval = config?.health_check_interval ?? 60;
+const domainGroups = config?.domain_groups ?? '';
+---
+
+<Base title={title} favicon={favicon}>
+  <div class="min-h-screen flex flex-col">
+    <Header title={title} subtitle={subtitle} icon={favicon} />
+
+    <main class="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+      {loadError && (
+        <div class="mb-6 flex items-center gap-3 rounded-lg border border-yellow-500/40 dark:border-yellow-800/50 bg-yellow-50 dark:bg-yellow-950/30 px-4 py-3 text-sm text-yellow-700 dark:text-yellow-400">
+          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+          </svg>
+          Could not load config.yml — showing cached data if available.
+        </div>
+      )}
+
+      <!-- ── Dashboard: Main (SSR) ── -->
+      <div id="dashboard-main">
+        {config?.sections && config.sections.length > 0 ? (
+          config.sections.map((section) => (
+            <Section section={section} />
+          ))
+        ) : !loadError ? (
+          <div class="flex flex-col items-center justify-center py-24 text-center">
+            <div class="w-12 h-12 rounded-xl bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center mb-4">
+              <svg class="w-6 h-6 text-zinc-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+              </svg>
+            </div>
+            <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">No sections configured</p>
+            <p class="text-xs text-zinc-400 dark:text-zinc-600 mt-1">Edit <code class="font-mono text-zinc-500 dark:text-zinc-500">config.yml</code> to add services.</p>
+          </div>
+        ) : null}
+      </div>
+
+      <!-- ── Dashboard: URL-grouped (client-side) ── -->
+      <div id="dashboard-url" class="hidden">
+        <div id="dashboard-url-inner"></div>
+      </div>
+
+      <!-- ── Dashboard: Status-grouped (client-side) ── -->
+      <div id="dashboard-status" class="hidden">
+        <div id="dashboard-status-inner"></div>
+      </div>
+    </main>
+
+    <footer class="border-t border-zinc-200 dark:border-zinc-800/50 px-4 py-3 text-center">
+      <p class="text-xs text-zinc-400 dark:text-zinc-700">
+        Dockboard &mdash; <span id="last-updated" class="text-zinc-500 dark:text-zinc-600"></span>
+      </p>
+    </footer>
+  </div>
+</Base>
+
+<!-- Icon error fallback handler (inline, runs before images load) -->
+<script is:inline>
+  window.handleIconError = function(img) {
+    const simpleSlug = img.dataset.simpleIcon;
+    const hue = img.dataset.hue;
+    const initial = img.dataset.initial;
+
+    // Try SimpleIcons CDN if we haven't already
+    if (!img.dataset.simpleIconTried && simpleSlug) {
+      img.dataset.simpleIconTried = '1';
+      img.src = `https://cdn.simpleicons.org/${simpleSlug}/a1a1aa`;
+      return;
+    }
+
+    // Final fallback: colored avatar with the title's initial
+    const parent = img.parentElement;
+    if (!parent) return;
+    const isDark = document.documentElement.classList.contains('dark');
+    const avatar = document.createElement('div');
+    avatar.className = 'w-8 h-8 rounded flex items-center justify-center text-sm font-bold select-none';
+    avatar.style.background = isDark ? `hsl(${hue}, 40%, 20%)` : `hsl(${hue}, 35%, 88%)`;
+    avatar.style.color      = isDark ? `hsl(${hue}, 60%, 70%)` : `hsl(${hue}, 50%, 35%)`;
+    avatar.textContent = initial || '?';
+    parent.replaceChild(avatar, img);
+  };
+</script>
+
+<!-- Compact view + light mode global overrides -->
+<style is:global>
+  html[data-view="compact"] .services-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.5rem;
+  }
+  html[data-view="compact"] .service-card {
+    padding: 0.5rem 0.625rem;
+    gap: 0.5rem;
+  }
+  html[data-view="compact"] .card-description {
+    display: none;
+  }
+  html[data-view="compact"] .card-latency {
+    display: none !important;
+  }
+  html[data-view="compact"] .card-icon-wrap {
+    width: 2rem;
+    height: 2rem;
+    min-width: 2rem;
+  }
+  html[data-view="compact"] .card-icon-wrap .service-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+</style>
+
+<!-- Core dashboard logic -->
+<script define:vars={{ interval, configData: config, domainGroups }}>
+  /* ── Config cache ─────────────────────────────────────────────────────── */
+  const CACHE_KEY   = 'dockboard_config';
+  const INTERVAL_MS = interval * 1000;
+  if (configData) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(configData)); } catch (_) {}
+  }
+  // Fall back to cached config if server failed (configData is null on error)
+  const cfg = configData || (() => {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch { return null; }
+  })();
+
+  /* ── Status store: url → { online: bool|null, ms: number|null } ───────── */
+  const statusStore = new Map();
+  if (cfg) cfg.sections?.forEach(s => s.items?.forEach(i => statusStore.set(i.url, { online: null, ms: null })));
+
+  /* ── Badge helpers ──────────────────────────────────────────────────────── */
+  const BASE_BADGE = 'status-badge absolute top-3 right-3 w-2 h-2 rounded-full transition-colors duration-300';
+  const CLS_ONLINE  = 'bg-emerald-500 shadow-[0_0_6px_1px_rgba(16,185,129,0.45)]';
+  const CLS_OFFLINE = 'bg-red-500 shadow-[0_0_6px_1px_rgba(239,68,68,0.4)]';
+  const CLS_GREY    = 'bg-zinc-600';
+
+  function applyStatusToCard(card, result) {
+    const badge     = card.querySelector('.status-badge');
+    const latencyEl = card.querySelector('.card-latency');
+    if (!badge) return;
+    if (result.online) {
+      badge.className = `${BASE_BADGE} ${CLS_ONLINE}`;
+      badge.setAttribute('aria-label', 'Status: online');
+      const lat = result.ms ? ` · ${result.ms}ms` : '';
+      badge.setAttribute('title', `Online${lat}`);
+      if (latencyEl && result.ms) {
+        latencyEl.textContent = `${result.ms}ms`;
+        latencyEl.classList.remove('hidden');
+      }
+    } else {
+      badge.className = `${BASE_BADGE} ${CLS_OFFLINE}`;
+      badge.setAttribute('aria-label', 'Status: offline');
+      badge.setAttribute('title', 'Offline or unreachable');
+      if (latencyEl) latencyEl.classList.add('hidden');
+    }
+    updateSectionCounters(card.closest('section[data-section-name]'));
+  }
+
+  /* ── Section counters ───────────────────────────────────────────────────── */
+  function updateSectionCounters(sectionEl) {
+    const targets = sectionEl
+      ? [sectionEl]
+      : [...document.querySelectorAll('section[data-section-name]')];
+    targets.forEach((el) => {
+      if (!el) return;
+      const counterEl = el.querySelector('.section-counter');
+      if (!counterEl) return;
+      const total  = parseInt(counterEl.dataset.total) || 0;
+      const online = el.querySelectorAll('.service-card [aria-label="Status: online"]').length;
+      counterEl.textContent = `${online}/${total}`;
+      counterEl.className = `section-counter text-xs tabular-nums font-medium ${
+        online === total ? 'text-emerald-500' :
+        online === 0    ? 'text-red-400'      : 'text-amber-600 dark:text-yellow-500'
+      }`;
+    });
+  }
+
+  /* ── Footer ─────────────────────────────────────────────────────────────── */
+  const lastUpdated = document.getElementById('last-updated');
+  function updateFooter() {
+    if (!lastUpdated) return;
+    const now = new Date();
+    lastUpdated.textContent = `Updated at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  updateFooter();
+
+  /* ── Health check (per URL, not per card) ──────────────────────────────── */
+  async function checkViaServer(url) {
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 7000);
+    try {
+      const resp = await fetch(`/api/health?url=${encodeURIComponent(url)}`, { cache: 'no-store', signal: ctrl.signal });
+      clearTimeout(tid);
+      const data = await resp.json();
+      return data.online === true ? { online: true, ms: data.ms ?? null } : { online: false, ms: null };
+    } catch { clearTimeout(tid); return null; }
+  }
+
+  async function checkViaClient(url) {
+    const ctrl  = new AbortController();
+    const start = performance.now();
+    const tid   = setTimeout(() => ctrl.abort(), 6000);
+    try {
+      await fetch(url, { mode: 'no-cors', cache: 'no-store', signal: ctrl.signal });
+      clearTimeout(tid);
+      return { online: true, ms: Math.round(performance.now() - start) };
+    } catch { clearTimeout(tid); return { online: false, ms: null }; }
+  }
+
+  /**
+   * Check a single URL, update statusStore, then apply the result to every
+   * card showing that URL across ALL visible dashboards.
+   * No intermediate "grey/checking" state is set — the badge keeps its current
+   * colour until the real result arrives.
+   */
+  async function checkServiceByUrl(url) {
+    let result = await checkViaServer(url);
+    if (result === null) result = await checkViaClient(url);
+    statusStore.set(url, result);
+    document.querySelectorAll(`.service-card[data-url="${CSS.escape(url)}"]`).forEach(card => {
+      applyStatusToCard(card, result);
+    });
+  }
+
+  async function runAllChecks() {
+    if (!cfg) return;
+    const urls = [...new Set(cfg.sections.flatMap(s => (s.items || []).map(i => i.url)))];
+    await Promise.allSettled(urls.map(checkServiceByUrl));
+    // Re-render status dashboard if it is currently active
+    const statusEl = document.getElementById('dashboard-status');
+    if (statusEl && !statusEl.classList.contains('hidden')) renderStatusDashboard();
+    updateFooter();
+    updateSectionCounters();
+  }
+
+  /* ── Section collapse state ───────────────────────────────────────────── */
+  const COLLAPSE_KEY = 'dockboard_collapsed';
+  function loadCollapsed() {
+    try { return JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]'); } catch { return []; }
+  }
+  function isSectionCollapsed(name) {
+    return loadCollapsed().includes(name);
+  }
+  function toggleCollapse(name) {
+    const list = loadCollapsed();
+    const idx  = list.indexOf(name);
+    if (idx === -1) list.push(name); else list.splice(idx, 1);
+    try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(list)); } catch (_) {}
+  }
+
+  /* ── Card / Section HTML builders ─────────────────────────────────────── */
+  function titleToHue(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
+    return Math.abs(h) % 360;
+  }
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderCard(item) {
+    const hue     = titleToHue(item.title);
+    const initial = item.title.charAt(0).toUpperCase();
+    const slug    = item.title.toLowerCase().replace(/\s+/g,'').replace(/[^a-z0-9]/g,'');
+    const iconSrc = item.icon ? `/icons/${escHtml(item.icon)}` : `https://cdn.simpleicons.org/${escHtml(slug)}/a1a1aa`;
+    const st      = statusStore.get(item.url) || { online: null, ms: null };
+    let bCls, bLabel, bTitle;
+    if (st.online === null) { bCls = CLS_GREY;    bLabel = 'checking'; bTitle = 'Checking\u2026'; }
+    else if (st.online)     { bCls = CLS_ONLINE;  bLabel = 'online';   bTitle = st.ms ? `Online · ${st.ms}ms` : 'Online'; }
+    else                    { bCls = CLS_OFFLINE; bLabel = 'offline';  bTitle = 'Offline or unreachable'; }
+
+    const latencyHtml = (st.online && st.ms)
+      ? `<span class="card-latency absolute top-2.5 right-6 text-[10px] tabular-nums font-mono leading-none text-zinc-500 dark:text-zinc-400 pointer-events-none select-none">${st.ms}ms</span>`
+      : `<span class="card-latency hidden absolute top-2.5 right-6 text-[10px] tabular-nums font-mono leading-none text-zinc-500 dark:text-zinc-400 pointer-events-none select-none"></span>`;
+    const descHtml = item.description
+      ? `<p class="card-description text-xs text-zinc-500 mt-0.5 line-clamp-2 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 transition-colors">${escHtml(item.description)}</p>`
+      : '';
+
+    return `<a href="${escHtml(item.url)}" target="_blank" rel="noopener noreferrer"
+      data-url="${escHtml(item.url)}" data-icon="${escHtml(item.icon||'')}"
+      class="service-card group relative flex items-start gap-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 transition-all duration-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-lg hover:shadow-zinc-200/80 dark:hover:shadow-zinc-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500">
+      <span class="${BASE_BADGE} ${bCls}" aria-label="Status: ${bLabel}" title="${escHtml(bTitle)}"></span>
+      ${latencyHtml}
+      <div class="card-icon-wrap shrink-0 w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+        <img class="service-icon w-8 h-8 object-contain" src="${iconSrc}" alt="${escHtml(item.title)}"
+             loading="lazy" decoding="async"
+             data-simple-icon="${escHtml(slug)}" data-hue="${hue}" data-initial="${escHtml(initial)}"
+             onerror="handleIconError(this)">
+      </div>
+      <div class="min-w-0 flex-1 pr-4">
+        <p class="card-title text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">${escHtml(item.title)}</p>
+        ${descHtml}
+      </div>
+    </a>`;
+  }
+
+  function renderSectionHtml(name, items) {
+    const total = items.length;
+    const collapsed = isSectionCollapsed(name);
+    const chevronCls = collapsed ? '-rotate-90' : '';
+    const bodyCls   = collapsed ? 'hidden' : '';
+    return `<section class="mb-6" data-section-name="${escHtml(name)}">
+      <button type="button" class="section-toggle w-full flex items-center gap-3 mb-4 group" aria-expanded="${!collapsed}">
+        <svg class="section-chevron w-3.5 h-3.5 shrink-0 text-zinc-400 dark:text-zinc-500 transition-transform duration-200 ${chevronCls}"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 transition-colors">${escHtml(name)}</h2>
+        <div class="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></div>
+        <span class="section-counter text-xs tabular-nums font-medium text-zinc-400 dark:text-zinc-600" data-total="${total}">\u2026/${total}</span>
+      </button>
+      <div class="section-body services-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 ${bodyCls}">
+        ${items.map(renderCard).join('')}
+      </div>
+    </section>`;
+  }
+
+  /* ── URL-based grouping ─────────────────────────────────────────────────── */
+  function groupByUrl() {
+    const patterns  = (domainGroups || '').split(/\s+/).filter(Boolean);
+    const ipMap     = {};
+    const domainMap = {};
+    const others    = [];
+    (cfg?.sections || []).forEach(s => (s.items || []).forEach(item => {
+      try {
+        const hostname = new URL(item.url).hostname;
+        if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
+          (ipMap[hostname] = ipMap[hostname] || []).push(item);
+        } else {
+          let matched = false;
+          for (const p of patterns) {
+            if (hostname === p || hostname.endsWith('.' + p)) {
+              (domainMap[p] = domainMap[p] || []).push(item);
+              matched = true; break;
+            }
+          }
+          if (!matched) others.push(item);
+        }
+      } catch { others.push(item); }
+    }));
+    const sections = [];
+    Object.keys(ipMap).sort().forEach(ip => sections.push({ name: ip, items: ipMap[ip] }));
+    Object.keys(domainMap).forEach(p => sections.push({ name: `*.${p}`, items: domainMap[p] }));
+    if (others.length) sections.push({ name: 'Others', items: others });
+    return sections;
+  }
+
+  /* ── Status-based grouping ──────────────────────────────────────────────── */
+  function groupByStatus() {
+    const online = [], offline = [], checking = [];
+    (cfg?.sections || []).forEach(s => (s.items || []).forEach(item => {
+      const st = statusStore.get(item.url);
+      if (!st || st.online === null) checking.push(item);
+      else if (st.online) online.push(item);
+      else offline.push(item);
+    }));
+    const sections = [];
+    if (online.length)   sections.push({ name: `Available (${online.length})`,    items: online });
+    if (offline.length)  sections.push({ name: `Down (${offline.length})`,         items: offline });
+    if (checking.length) sections.push({ name: `Unchecked (${checking.length})`, items: checking });
+    return sections;
+  }
+
+  /* ── Dashboard renderers ───────────────────────────────────────────────── */
+  let urlRendered = false;
+  function renderUrlDashboard() {
+    if (urlRendered) return;
+    const el = document.getElementById('dashboard-url-inner');
+    if (!el) return;
+    const sections = groupByUrl();
+    el.innerHTML = sections.length
+      ? sections.map(s => renderSectionHtml(s.name, s.items)).join('')
+      : '<p class="text-sm text-zinc-400 py-8 text-center">No services configured.</p>';
+    urlRendered = true;
+    updateSectionCounters();
+    // Apply any already-known statuses immediately
+    document.querySelectorAll('#dashboard-url-inner .service-card').forEach(card => {
+      const st = statusStore.get(card.dataset.url);
+      if (st && st.online !== null) applyStatusToCard(card, st);
+    });
+  }
+
+  function renderStatusDashboard() {
+    const el = document.getElementById('dashboard-status-inner');
+    if (!el) return;
+    const sections = groupByStatus();
+    el.innerHTML = sections.length
+      ? sections.map(s => renderSectionHtml(s.name, s.items)).join('')
+      : '<p class="text-sm text-zinc-400 py-8 text-center">No services configured.</p>';
+    updateSectionCounters();
+  }
+
+  /* ── Listen for dashboard switches ─────────────────────────────────────── */
+  document.addEventListener('dockboard:dashboard', function(e) {
+    const name = e.detail.name;
+    if (name === 'url')    renderUrlDashboard();
+    if (name === 'status') renderStatusDashboard();
+  });
+
+  /* ── Search ─────────────────────────────────────────────────────────────── */
+  document.addEventListener('dockboard:search', function(e) {
+    const q = (e.detail.query || '').toLowerCase().trim();
+    // Determine active dashboard
+    const activeDash = document.querySelector('.dash-tab.active')?.dataset?.dashboard || 'main';
+    const dashEl = document.getElementById('dashboard-' + activeDash);
+    if (!dashEl) return;
+    dashEl.querySelectorAll('.service-card').forEach(card => {
+      const titleText = (card.querySelector('.card-title')?.textContent || '').toLowerCase();
+      const descText  = (card.querySelector('.card-description')?.textContent || '').toLowerCase();
+      const urlText   = (card.dataset.url || '').toLowerCase();
+      const match = !q || titleText.includes(q) || descText.includes(q) || urlText.includes(q);
+      card.style.display = match ? '' : 'none';
+    });
+    // Hide sections with no visible cards
+    dashEl.querySelectorAll('section[data-section-name]').forEach(section => {
+      const visible = [...section.querySelectorAll('.service-card')].some(c => c.style.display !== 'none');
+      section.style.display = visible ? '' : 'none';
+    });
+  });
+
+  /* ── Recent items: track service-card clicks ────────────────────────────── */
+  document.addEventListener('click', function(e) {
+    const card = e.target.closest('.service-card');
+    if (!card) return;
+    const titleEl = card.querySelector('.card-title');
+    const title = titleEl ? titleEl.textContent.trim() : '';
+    const url   = card.dataset.url || '';
+    const icon  = card.dataset.icon || '';
+    if (title && url && typeof window.dockboardAddRecent === 'function') {
+      window.dockboardAddRecent({ title, url, icon });
+    }
+  });
+
+  /* ── Boot ───────────────────────────────────────────────────────────────── */
+  // Restore collapse state for SSR-rendered sections (dashboard-main)
+  loadCollapsed().forEach(function(name) {
+    const section = document.querySelector(`section[data-section-name="${CSS.escape(name)}"]`);
+    if (!section) return;
+    const btn     = section.querySelector('.section-toggle');
+    const body    = section.querySelector('.section-body');
+    const chevron = section.querySelector('.section-chevron');
+    btn?.setAttribute('aria-expanded', 'false');
+    body?.classList.add('hidden');
+    chevron?.classList.add('-rotate-90');
+  });
+
+  // Global section toggle handler (covers SSR + dynamic dashboards)
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.section-toggle');
+    if (!btn) return;
+    const section = btn.closest('section[data-section-name]');
+    if (!section) return;
+    const body     = section.querySelector('.section-body');
+    const chevron  = btn.querySelector('.section-chevron');
+    const isOpen   = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!isOpen));
+    body?.classList.toggle('hidden', isOpen);
+    chevron?.classList.toggle('-rotate-90', isOpen);
+    toggleCollapse(section.dataset.sectionName);
+  });
+
+  setTimeout(runAllChecks, 800);
+  setInterval(runAllChecks, INTERVAL_MS);
+</script>

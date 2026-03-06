@@ -1,0 +1,50 @@
+# Dockboard Configuration — copy this file to config.yml and edit it
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Dashboard title shown in the browser tab and header
+title: "My Homelab"
+
+# Optional subtitle shown below the title in the header
+subtitle: "Self-hosted services"
+
+# Optional — filename of a logo placed in the icons/ directory
+# icon: mylogo.svg
+
+# How often (in seconds) the browser checks all service health endpoints
+health_check_interval: 60
+
+# Domain patterns used by the "By URL" dashboard to create named groups.
+# Space-separated list of domain suffixes you own.
+# domain_groups: "example.com mysite.local"
+
+sections:
+  - name: Infrastructure
+    items:
+      - title: Portainer
+        description: Manage your Docker environments
+        icon: portainer.png          # place portainer.png in icons/
+        url: http://192.168.1.10:9443
+
+      - title: Traefik
+        description: Cloud-native reverse proxy
+        icon: traefik.png
+        url: http://192.168.1.10:8080
+
+  - name: Media
+    items:
+      - title: Jellyfin
+        description: Open source media server
+        icon: jellyfin.png
+        url: http://192.168.1.10:8096
+
+      - title: Navidrome
+        description: Music streaming server
+        icon: navidrome.png
+        url: http://192.168.1.10:4533
+
+  - name: Utilities
+    items:
+      - title: Example Service
+        description: This is a placeholder — replace with your own service
+        icon: example-service.png    # the bundled placeholder icon
+        url: http://192.168.1.10:3000

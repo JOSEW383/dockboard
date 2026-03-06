@@ -1,0 +1,86 @@
+---
+import type { ServiceItem } from '../pages/api/config';
+
+interface Props {
+  item: ServiceItem;
+}
+const { item } = Astro.props;
+
+// Build the icon src priority:
+// 1. /icons/<file> if item.icon is set
+// 2. SimpleIcons CDN fallback (handled client-side via JS)
+const localIconSrc = item.icon ? `/icons/${item.icon}` : null;
+
+// Generate a deterministic hue from the title for the avatar fallback
+function titleToHue(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash) % 360;
+}
+const hue = titleToHue(item.title);
+const initial = item.title.charAt(0).toUpperCase();
+// Encode the slug for SimpleIcons
+const simpleIconSlug = item.title.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+---
+
+<a
+  href={item.url}
+  target="_blank"
+  rel="noopener noreferrer"
+  data-url={item.url}
+  data-icon={item.icon || ''}
+  class="service-card group relative flex items-start gap-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 transition-all duration-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-lg hover:shadow-zinc-200/80 dark:hover:shadow-zinc-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
+>
+  <!-- Status badge + latency (absolutely positioned, zero layout impact) -->
+  <span
+    class="status-badge absolute top-3 right-3 w-2 h-2 rounded-full bg-zinc-600 transition-colors duration-300"
+    aria-label="Status: checking"
+    title="Checking…"
+  ></span>
+  <span
+    class="card-latency hidden absolute top-2.5 right-6 text-[10px] tabular-nums font-mono leading-none text-zinc-500 dark:text-zinc-400 pointer-events-none select-none"
+  ></span>
+
+  <!-- Icon -->
+  <div class="card-icon-wrap shrink-0 w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+    {localIconSrc ? (
+      <img
+        class="service-icon w-8 h-8 object-contain"
+        src={localIconSrc}
+        alt={item.title}
+        data-simple-icon={simpleIconSlug}
+        data-hue={hue}
+        data-initial={initial}
+        loading="lazy"
+        decoding="async"
+        onerror="handleIconError(this)"
+      />
+    ) : (
+      <img
+        class="service-icon w-8 h-8 object-contain"
+        src={`https://cdn.simpleicons.org/${simpleIconSlug}/a1a1aa`}
+        alt={item.title}
+        data-simple-icon={simpleIconSlug}
+        data-hue={hue}
+        data-initial={initial}
+        loading="lazy"
+        decoding="async"
+        onerror="handleIconError(this)"
+      />
+    )}
+  </div>
+
+  <!-- Content -->
+  <div class="min-w-0 flex-1 pr-4">
+    <p class="card-title text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">
+      {item.title}
+    </p>
+    {item.description && (
+      <p class="card-description text-xs text-zinc-500 mt-0.5 line-clamp-2 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 transition-colors">
+        {item.description}
+      </p>
+    )}
+  </div>
+</a>
