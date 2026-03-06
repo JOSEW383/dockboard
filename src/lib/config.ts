@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { watch }    from 'node:fs';
+import { resolve }  from 'node:path';
 import yaml from 'js-yaml';
 
 export interface ServiceItem {
@@ -36,21 +37,55 @@ export function getIconsDir(): string {
   return resolve(process.cwd(), 'icons');
 }
 
-// Simple in-memory cache: re-reads config at most once every 30s
-let cache: { config: DockboardConfig; ts: number } | null = null;
-const CACHE_TTL = 30_000;
+// ── Cache invalidated instantly via fs.watch ──────────────────────────────────
+let cache: DockboardConfig | null = null;
+let watcherAttached = false;
+
+/**
+ * Attach an fs.watch listener on the config file (and its parent directory for
+ * editors that do atomic writes via rename). Idempotent — only attaches once.
+ * Invalidates the in-memory cache the moment any change is detected.
+ */
+function attachWatcher(configPath: string): void {
+  if (watcherAttached) return;
+  watcherAttached = true;
+
+  // Watch the file directly for in-place writes
+  try {
+    const fw = watch(configPath, () => {
+      console.log('[dockboard] config.yml changed — cache invalidated');
+      cache = null;
+    });
+    fw.on('error', () => { /* file may not exist yet */ });
+  } catch (_) {}
+
+  // Also watch the parent directory for rename-based atomic writes
+  // (many editors like vim/nano write a temp file then rename it)
+  try {
+    const dir = resolve(configPath, '..');
+    const dw  = watch(dir, (_event, filename) => {
+      if (filename && resolve(dir, filename) === configPath) {
+        console.log('[dockboard] config.yml changed (rename) — cache invalidated');
+        cache = null;
+      }
+    });
+    dw.on('error', () => {});
+  } catch (_) {}
+}
 
 export async function loadConfig(): Promise<DockboardConfig> {
-  const now = Date.now();
-  if (cache && now - cache.ts < CACHE_TTL) return cache.config;
-
   const configPath = getConfigPath();
+
+  // Attach the file watcher once (no-op on subsequent calls)
+  attachWatcher(configPath);
+
+  if (cache) return cache;
+
   console.log('[dockboard] Loading config from:', configPath);
-
-  const raw = await readFile(configPath, 'utf-8');
+  const raw    = await readFile(configPath, 'utf-8');
   const config = yaml.load(raw) as DockboardConfig;
-
   console.log(`[dockboard] Config loaded OK — ${config.sections?.length ?? 0} sections`);
-  cache = { config, ts: now };
+
+  cache = config;
   return config;
 }
