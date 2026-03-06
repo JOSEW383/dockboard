@@ -3,15 +3,16 @@ interface Props {
   title: string;
   subtitle?: string;
   icon?: string;
+  iconLink?: string;
 }
-const { title, subtitle, icon } = Astro.props;
+const { title, subtitle, icon, iconLink } = Astro.props;
 const iconSrc = icon ? `/icons/${icon}` : null;
 ---
 
 <header class="border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-10">
   <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3">
     <!-- Logo mark -->
-    <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shrink-0 overflow-hidden">
+    <a href={iconLink ?? '#'} target={iconLink ? '_blank' : '_self'} rel="noopener noreferrer" title={title} class="flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shrink-0 overflow-hidden hover:ring-2 hover:ring-zinc-400 dark:hover:ring-zinc-500 transition-shadow">
       {iconSrc ? (
         <img src={iconSrc} alt={title} class="w-8 h-8 object-contain" />
       ) : (
@@ -20,7 +21,7 @@ const iconSrc = icon ? `/icons/${icon}` : null;
           <path d="M8 21h8M12 17v4" />
         </svg>
       )}
-    </div>
+    </a>
 
     <!-- Title -->
     <div class="min-w-0 flex-1">

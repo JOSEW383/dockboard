@@ -1,9 +1,9 @@
 # Dockboard
 
+![Dockboard](public/dockboard.png)
+
 A clean, self-hosted service dashboard for your homelab.  
 Single config file, zero database, live health checks, multiple dashboard views.
-
-![GitHub Actions](https://github.com/<your-github-user>/dockboard/actions/workflows/docker-publish.yml/badge.svg)
 
 ---
 

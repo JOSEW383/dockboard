@@ -10,6 +10,9 @@ subtitle: "Self-hosted services"
 # Optional — filename of a logo placed in the icons/ directory
 # icon: mylogo.svg
 
+# Optional — URL the header icon links to (opens in a new tab)
+# icon_link: "https://github.com/youruser/dockboard"
+
 # How often (in seconds) the browser checks all service health endpoints
 health_check_interval: 60
 

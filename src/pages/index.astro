@@ -18,13 +18,14 @@ try {
 const title = config?.title ?? 'Dockboard';
 const subtitle = config?.subtitle;
 const favicon = config?.icon;
+const iconLink = config?.icon_link;
 const interval = config?.health_check_interval ?? 60;
 const domainGroups = config?.domain_groups ?? '';
 ---
 
 <Base title={title} favicon={favicon}>
   <div class="min-h-screen flex flex-col">
-    <Header title={title} subtitle={subtitle} icon={favicon} />
+    <Header title={title} subtitle={subtitle} icon={favicon} iconLink={iconLink} />
 
     <main class="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
       {loadError && (
