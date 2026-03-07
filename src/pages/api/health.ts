@@ -24,7 +24,10 @@ function checkUrl(urlStr: string): Promise<{ online: boolean; ms: number }> {
       };
 
       const req = lib.request(options, (res) => {
-        resolve({ online: true, ms: Date.now() - start });
+        const status = res.statusCode ?? 0;
+        // 2xx/3xx = online; 401/403 = protected but alive; everything else (404, 5xx…) = offline
+        const online = (status >= 200 && status < 400) || status === 401 || status === 403;
+        resolve({ online, ms: Date.now() - start });
         res.resume(); // discard body
       });
 
