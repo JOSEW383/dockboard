@@ -2,12 +2,15 @@ import type { APIRoute } from 'astro';
 import https from 'node:https';
 import http from 'node:http';
 
-/** HEAD-request a URL server-side, ignoring self-signed TLS certificates.
+/** HTTP request a URL server-side, ignoring self-signed TLS certificates.
  *  Returns { online, ms } where ms is the round-trip time in milliseconds.
  */
-function checkUrl(urlStr: string): Promise<{ online: boolean; ms: number }> {
+function makeRequest(
+  urlStr: string,
+  method: 'HEAD' | 'GET',
+  start: number,
+): Promise<{ online: boolean; ms: number }> {
   return new Promise((resolve) => {
-    const start = Date.now();
     try {
       const url = new URL(urlStr);
       const isHttps = url.protocol === 'https:';
@@ -17,7 +20,7 @@ function checkUrl(urlStr: string): Promise<{ online: boolean; ms: number }> {
         hostname: url.hostname,
         port: url.port || (isHttps ? 443 : 80),
         path: (url.pathname || '/') + url.search,
-        method: 'HEAD',
+        method,
         timeout: 6000,
         // Ignore self-signed / internal certificates
         ...(isHttps && { rejectUnauthorized: false }),
@@ -25,23 +28,47 @@ function checkUrl(urlStr: string): Promise<{ online: boolean; ms: number }> {
 
       const req = lib.request(options, (res) => {
         const status = res.statusCode ?? 0;
-        // 2xx/3xx = online; 401/403 = protected but alive; everything else (404, 5xx…) = offline
-        const online = (status >= 200 && status < 400) || status === 401 || status === 403;
-        resolve({ online, ms: Date.now() - start });
+        const contentType = res.headers['content-type'] ?? '';
         res.resume(); // discard body
+
+        // 2xx/3xx = online
+        // 401/403 = protected but alive
+        // 405 = server rejected HEAD method but is alive (caller should retry with GET)
+        // 404 + application/json = live API with no root handler (e.g. microservices)
+        // everything else = offline
+        const online =
+          (status >= 200 && status < 400) ||
+          status === 401 ||
+          status === 403 ||
+          status === 405 ||
+          (status === 404 && contentType.includes('application/json'));
+
+        resolve({ online, ms: Date.now() - start, retryWithGet: status === 405 } as never);
       });
 
-      req.on('error', () => resolve({ online: false, ms: 0 }));
+      req.on('error', () => resolve({ online: false, ms: 0 } as never));
       req.on('timeout', () => {
         req.destroy();
-        resolve({ online: false, ms: 0 });
+        resolve({ online: false, ms: 0 } as never);
       });
 
       req.end();
     } catch {
-      resolve({ online: false, ms: 0 });
+      resolve({ online: false, ms: 0 } as never);
     }
   });
+}
+
+async function checkUrl(urlStr: string): Promise<{ online: boolean; ms: number }> {
+  const start = Date.now();
+  const head = await makeRequest(urlStr, 'HEAD', start) as { online: boolean; ms: number; retryWithGet?: boolean };
+
+  // If the server returned 405 (Method Not Allowed for HEAD), retry with GET
+  if (head.retryWithGet) {
+    return makeRequest(urlStr, 'GET', start);
+  }
+
+  return { online: head.online, ms: head.ms };
 }
 
 export const GET: APIRoute = async ({ request }) => {
