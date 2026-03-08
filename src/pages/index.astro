@@ -113,6 +113,26 @@ const domainGroups = config?.domain_groups ?? '';
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
   }
+  @media (min-width: 768px) {
+    html[data-view="compact"] .services-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1280px) {
+    html[data-view="compact"] .services-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1440px) {
+    html[data-view="compact"] .services-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1680px) {
+    html[data-view="compact"] .services-grid {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
   html[data-view="compact"] .service-card {
     padding: 0.5rem 0.625rem;
     gap: 0.5rem;
