@@ -100,21 +100,19 @@ const iconSrc = icon ? `/icons/${icon}` : null;
       </button>
     </div>
 
-    <!-- Mobile dashboard switcher (compact) -->
+    <!-- Mobile dashboard switcher (dropdown) -->
     <div class="flex sm:hidden items-center">
-      <button
-        id="dash-cycle-mobile"
-        type="button"
-        title="Switch dashboard"
-        class="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-colors"
+      <label for="dash-select-mobile" class="sr-only">Dashboard</label>
+      <select
+        id="dash-select-mobile"
+        aria-label="Select dashboard"
+        class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500"
       >
-        <svg viewBox="0 0 24 24" fill="none" class="w-4 h-4" stroke="currentColor" stroke-width="2">
-          <polyline points="17 1 21 5 17 9"/>
-          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-          <polyline points="7 23 3 19 7 15"/>
-          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-        </svg>
-      </button>
+        <option value="main">Main</option>
+        <option value="url">By URL</option>
+        <option value="status">Status</option>
+        <option value="metrics">Metrics</option>
+      </select>
     </div>
 
     <!-- Right side controls -->
@@ -270,6 +268,8 @@ const iconSrc = icon ? `/icons/${icon}` : null;
       var el = document.getElementById('dashboard-' + d);
       if (el) el.classList.toggle('hidden', d !== name);
     });
+    var mobileSelect = document.getElementById('dash-select-mobile');
+    if (mobileSelect && mobileSelect.value !== name) mobileSelect.value = name;
     try { localStorage.setItem('dockboard_dashboard', name); } catch(_) {}
     // Trigger render if needed (url/status dashboards)
     var ev = new CustomEvent('dockboard:dashboard', { detail: { name: name } });
@@ -291,11 +291,10 @@ const iconSrc = icon ? `/icons/${icon}` : null;
   document.querySelectorAll('.dash-tab').forEach(function(btn) {
     btn.addEventListener('click', function() { activateDashboard(btn.dataset.dashboard); });
   });
-  // Mobile cycle button
-  document.getElementById('dash-cycle-mobile')?.addEventListener('click', function() {
-    var cur = document.querySelector('.dash-tab.active')?.dataset.dashboard || 'main';
-    var idx = DASHBOARDS.indexOf(cur);
-    activateDashboard(DASHBOARDS[(idx + 1) % DASHBOARDS.length]);
+  // Mobile dropdown
+  document.getElementById('dash-select-mobile')?.addEventListener('change', function(e) {
+    var selected = e.target?.value || 'main';
+    if (DASHBOARDS.includes(selected)) activateDashboard(selected);
   });
 
   // ── Search toggle ──────────────────────────────────────────────────────────
