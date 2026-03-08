@@ -80,6 +80,24 @@ const iconSrc = icon ? `/icons/${icon}` : null;
           <span class="hidden md:inline">Status</span>
         </span>
       </button>
+      <button
+        id="dash-btn-metrics"
+        data-dashboard="metrics"
+        type="button"
+        title="Metrics dashboard"
+        class="dash-tab px-2.5 py-1 rounded-md text-xs font-medium transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+      >
+        <span class="flex items-center gap-1.5">
+          <!-- Bar chart icon -->
+          <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="20" x2="20" y2="20"/>
+            <rect x="6" y="11" width="2.5" height="7" rx="0.5"/>
+            <rect x="11" y="7" width="2.5" height="11" rx="0.5"/>
+            <rect x="16" y="4" width="2.5" height="14" rx="0.5"/>
+          </svg>
+          <span class="hidden md:inline">Metrics</span>
+        </span>
+      </button>
     </div>
 
     <!-- Mobile dashboard switcher (compact) -->
@@ -233,7 +251,7 @@ const iconSrc = icon ? `/icons/${icon}` : null;
   });
 
   // ── Dashboard switcher ─────────────────────────────────────────────────────
-  var DASHBOARDS = ['main', 'url', 'status'];
+  var DASHBOARDS = ['main', 'url', 'status', 'metrics'];
   function activateDashboard(name) {
     // Update tab styles
     document.querySelectorAll('.dash-tab').forEach(function(btn) {
@@ -257,11 +275,18 @@ const iconSrc = icon ? `/icons/${icon}` : null;
     var ev = new CustomEvent('dockboard:dashboard', { detail: { name: name } });
     document.dispatchEvent(ev);
   }
-  // Init from saved or default
-  var savedDash = 'main';
-  try { savedDash = localStorage.getItem('dockboard_dashboard') || 'main'; } catch(_) {}
-  if (!DASHBOARDS.includes(savedDash)) savedDash = 'main';
-  activateDashboard(savedDash);
+  // Init from saved or default (after DOM is ready so panels exist)
+  function initDashboardFromStorage() {
+    var savedDash = 'main';
+    try { savedDash = localStorage.getItem('dockboard_dashboard') || 'main'; } catch(_) {}
+    if (!DASHBOARDS.includes(savedDash)) savedDash = 'main';
+    activateDashboard(savedDash);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDashboardFromStorage, { once: true });
+  } else {
+    initDashboardFromStorage();
+  }
 
   document.querySelectorAll('.dash-tab').forEach(function(btn) {
     btn.addEventListener('click', function() { activateDashboard(btn.dataset.dashboard); });
