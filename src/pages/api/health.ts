@@ -9,7 +9,7 @@ function makeRequest(
   urlStr: string,
   method: 'HEAD' | 'GET',
   start: number,
-): Promise<{ online: boolean; ms: number }> {
+): Promise<{ online: boolean; ms: number; retryWithGet?: boolean }> {
   return new Promise((resolve) => {
     try {
       const url = new URL(urlStr);
@@ -28,43 +28,35 @@ function makeRequest(
 
       const req = lib.request(options, (res) => {
         const status = res.statusCode ?? 0;
-        const contentType = res.headers['content-type'] ?? '';
         res.resume(); // discard body
 
-        // 2xx/3xx = online
-        // 401/403 = protected but alive
-        // 405 = server rejected HEAD method but is alive (caller should retry with GET)
-        // 404 + application/json = live API with no root handler (e.g. microservices)
-        // everything else = offline
-        const online =
-          (status >= 200 && status < 400) ||
-          status === 401 ||
-          status === 403 ||
-          status === 405 ||
-          (status === 404 && contentType.includes('application/json'));
+        // Consider service online for any non-5xx HTTP response.
+        // Mark offline for server errors (5xx), network errors, DNS errors and timeouts.
+        const online = status > 0 && status < 500;
 
-        resolve({ online, ms: Date.now() - start, retryWithGet: status === 405 } as never);
+        resolve({ online, ms: Date.now() - start, retryWithGet: status === 405 });
       });
 
-      req.on('error', () => resolve({ online: false, ms: 0 } as never));
+      req.on('error', () => resolve({ online: false, ms: 0 }));
       req.on('timeout', () => {
         req.destroy();
-        resolve({ online: false, ms: 0 } as never);
+        resolve({ online: false, ms: 0 });
       });
 
       req.end();
     } catch {
-      resolve({ online: false, ms: 0 } as never);
+      resolve({ online: false, ms: 0 });
     }
   });
 }
 
 async function checkUrl(urlStr: string): Promise<{ online: boolean; ms: number }> {
   const start = Date.now();
-  const head = await makeRequest(urlStr, 'HEAD', start) as { online: boolean; ms: number; retryWithGet?: boolean };
+  const head = await makeRequest(urlStr, 'HEAD', start);
 
-  // If the server returned 405 (Method Not Allowed for HEAD), retry with GET
-  if (head.retryWithGet) {
+  // Retry with GET when HEAD is not supported (405) or HEAD fails at transport
+  // level (some services close the connection on HEAD but answer GET).
+  if (head.retryWithGet || (!head.online && head.ms === 0)) {
     return makeRequest(urlStr, 'GET', start);
   }
 
