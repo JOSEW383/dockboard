@@ -10,10 +10,11 @@ Single config file, zero database, live health checks, multiple dashboard views.
 ## Features
 
 - **Health badges** — each card shows a green/red dot checked on a configurable interval, with latency displayed
-- **3 dashboard views** (switchable from the header):
+- **Dashboard views** (switchable from the header):
   - **Main** — your sections exactly as defined in `config.yml`
   - **By URL** — auto-groups services by IP address, then by domain pattern (e.g. `*.svjs.top`), then others
   - **Status** — groups services into Available / Down / Unchecked
+  - **Docs** — renders configured markdown files and service `docs` directories as tabs
 - **Collapsible sections** — click any section header to collapse/expand; state persists across reloads
 - **Search** — live filter across the active dashboard by title, description or URL
 - **Recent items** — clock icon in the header shows the last 10 opened services
@@ -106,6 +107,9 @@ docker compose up -d
 | `icon` | string | — | Filename inside `icons/` used as logo |
 | `health_check_interval` | number | `60` | Seconds between health checks |
 | `domain_groups` | string | — | Space-separated domain suffixes for URL-dashboard grouping |
+| `docs` | list | — | Markdown files shown as tabs in Docs: `{ title, path }` |
+| `readme` | string | — | Back-compatible single markdown file shown in Docs |
+| `sections[].items[].docs` | string | — | Directory containing `README.md`, added as a Docs tab |
 | `sections[].name` | string | — | Section heading |
 | `sections[].items[].title` | string | — | Service name |
 | `sections[].items[].description` | string | — | Short description (optional) |
