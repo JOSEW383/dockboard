@@ -98,6 +98,23 @@ const iconSrc = icon ? `/icons/${icon}` : null;
           <span class="hidden md:inline">Metrics</span>
         </span>
       </button>
+      <button
+        id="dash-btn-docs"
+        data-dashboard="docs"
+        type="button"
+        title="Docs"
+        class="dash-tab px-2.5 py-1 rounded-md text-xs font-medium transition-colors text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+      >
+        <span class="flex items-center gap-1.5">
+          <!-- Document icon -->
+          <svg viewBox="0 0 24 24" fill="none" class="w-3.5 h-3.5" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <path d="M14 2v6h6"/>
+            <path d="M8 13h8M8 17h5"/>
+          </svg>
+          <span class="hidden md:inline">Docs</span>
+        </span>
+      </button>
     </div>
 
     <!-- Mobile dashboard switcher (dropdown) -->
@@ -112,6 +129,7 @@ const iconSrc = icon ? `/icons/${icon}` : null;
         <option value="url">By URL</option>
         <option value="status">Status</option>
         <option value="metrics">Metrics</option>
+        <option value="docs">Docs</option>
       </select>
     </div>
 
@@ -249,7 +267,7 @@ const iconSrc = icon ? `/icons/${icon}` : null;
   });
 
   // ── Dashboard switcher ─────────────────────────────────────────────────────
-  var DASHBOARDS = ['main', 'url', 'status', 'metrics'];
+  var DASHBOARDS = ['main', 'url', 'status', 'metrics', 'docs'];
   function activateDashboard(name) {
     // Update tab styles
     document.querySelectorAll('.dash-tab').forEach(function(btn) {

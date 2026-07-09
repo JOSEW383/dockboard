@@ -8,6 +8,8 @@ export interface ServiceItem {
   description?: string;
   icon?: string;
   url: string;
+  /** Optional directory containing README.md, shown in the Docs tab. */
+  docs?: string;
 }
 
 export interface Section {
@@ -19,9 +21,14 @@ export interface DockboardConfig {
   title?: string;
   subtitle?: string;
   icon?: string;
+  icon_link?: string;
   health_check_interval?: number;
   /** Space-separated list of domain suffixes for URL-dashboard grouping, e.g. "svjs.top mysite.com" */
   domain_groups?: string;
+  /** Optional markdown docs shown as tabs in the Docs dashboard. */
+  docs?: { title: string; path: string }[];
+  /** Back-compat: single markdown file shown in Docs. */
+  readme?: string;
   sections: Section[];
 }
 

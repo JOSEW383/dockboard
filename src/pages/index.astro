@@ -3,13 +3,26 @@ import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Section from '../components/Section.astro';
 import { loadConfig } from '../lib/config';
+import { renderMarkdownFile } from '../lib/markdown';
 import type { DockboardConfig } from '../lib/config';
 
 let config: DockboardConfig | null = null;
+let docs: { title: string; html: string }[] = [];
 let loadError = false;
 
 try {
   config = await loadConfig();
+  const docSources = [
+    ...(config.docs ?? []),
+    ...(config.readme ? [{ title: 'Readme', path: config.readme }] : []),
+    ...((config.sections ?? []).flatMap((section) => (section.items ?? [])
+      .filter((item) => item.docs)
+      .map((item) => ({ title: item.title, path: item.docs! }))))
+  ];
+  docs = (await Promise.all(docSources.map(async (doc) => {
+    try { return { title: doc.title, html: await renderMarkdownFile(doc.path) }; }
+    catch (err) { console.error('[dockboard] failed to load doc:', doc.path, err); return null; }
+  }))).filter(Boolean) as { title: string; html: string }[];
 } catch (err) {
   console.error('[dockboard] index.astro failed to load config:', err);
   loadError = true;
@@ -69,6 +82,24 @@ const domainGroups = config?.domain_groups ?? '';
       <!-- ── Dashboard: Metrics (client-side) ── -->
       <div id="dashboard-metrics" class="hidden">
         <div id="dashboard-metrics-inner"></div>
+      </div>
+
+      <!-- ── Dashboard: Docs (SSR) ── -->
+      <div id="dashboard-docs" class="hidden">
+        {docs.length ? (
+          <>
+            <div class="docs-tabs mb-4 flex flex-wrap gap-2">
+              {docs.map((doc, index) => (
+                <button type="button" data-doc-tab={index} class:list={["docs-tab px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors", index === 0 ? "bg-white dark:bg-zinc-700 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-zinc-100" : "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400"]}>{doc.title}</button>
+              ))}
+            </div>
+            {docs.map((doc, index) => (
+              <article data-doc-panel={index} class:list={["docs-panel readme-body rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-7", index !== 0 && "hidden"]} set:html={doc.html} />
+            ))}
+          </>
+        ) : (
+          <p class="text-sm text-zinc-400 py-8 text-center">No docs configured.</p>
+        )}
       </div>
     </main>
 
@@ -152,6 +183,24 @@ const domainGroups = config?.domain_groups ?? '';
     width: 1.5rem;
     height: 1.5rem;
   }
+  .readme-body { line-height: 1.7; }
+  .readme-body h1 { font-size: 1.875rem; line-height: 2.25rem; font-weight: 700; margin-bottom: 1rem; }
+  .readme-body h2 { font-size: 1.5rem; line-height: 2rem; font-weight: 650; margin: 1.75rem 0 .75rem; }
+  .readme-body h3 { font-size: 1.25rem; line-height: 1.75rem; font-weight: 650; margin: 1.5rem 0 .5rem; }
+  .readme-body p, .readme-body ul, .readme-body pre, .readme-body table, .readme-body hr { margin: .75rem 0; }
+  .readme-body ul { list-style: disc; padding-left: 1.5rem; }
+  .readme-body img { max-width: 100%; border-radius: .75rem; }
+  .readme-body table { width: 100%; border-collapse: collapse; display: block; overflow-x: auto; }
+  .readme-body th, .readme-body td { border: 1px solid rgb(228 228 231); padding: .5rem .75rem; text-align: left; }
+  .dark .readme-body th, .dark .readme-body td { border-color: rgb(39 39 42); }
+  .readme-body hr { border: 0; border-top: 1px solid rgb(228 228 231); }
+  .dark .readme-body hr { border-top-color: rgb(39 39 42); }
+  .readme-body a { color: #2563eb; text-decoration: underline; }
+  .dark .readme-body a { color: #60a5fa; }
+  .readme-body code { border-radius: .375rem; background: rgb(244 244 245); padding: .125rem .375rem; font-size: .875em; }
+  .dark .readme-body code { background: rgb(39 39 42); }
+  .readme-body pre { overflow-x: auto; border-radius: .75rem; background: rgb(24 24 27); color: rgb(244 244 245); padding: 1rem; }
+  .readme-body pre code { background: transparent; padding: 0; }
 </style>
 
 <!-- Core dashboard logic -->
@@ -642,6 +691,29 @@ const domainGroups = config?.domain_groups ?? '';
     if (name === 'url')    renderUrlDashboard();
     if (name === 'status') renderStatusDashboard();
     if (name === 'metrics') renderMetricsDashboard();
+  });
+
+  /* ── Docs tabs ──────────────────────────────────────────────────────────── */
+  document.addEventListener('click', function(e) {
+    const tab = e.target.closest('.docs-tab');
+    if (!tab) return;
+    const index = tab.dataset.docTab;
+    document.querySelectorAll('.docs-tab').forEach((btn) => {
+      const active = btn.dataset.docTab === index;
+      btn.classList.toggle('bg-white', active);
+      btn.classList.toggle('dark:bg-zinc-700', active);
+      btn.classList.toggle('border-zinc-300', active);
+      btn.classList.toggle('dark:border-zinc-600', active);
+      btn.classList.toggle('text-zinc-900', active);
+      btn.classList.toggle('dark:text-zinc-100', active);
+      btn.classList.toggle('bg-zinc-100', !active);
+      btn.classList.toggle('dark:bg-zinc-800', !active);
+      btn.classList.toggle('border-zinc-200', !active);
+      btn.classList.toggle('dark:border-zinc-700', !active);
+      btn.classList.toggle('text-zinc-500', !active);
+      btn.classList.toggle('dark:text-zinc-400', !active);
+    });
+    document.querySelectorAll('.docs-panel').forEach((panel) => panel.classList.toggle('hidden', panel.dataset.docPanel !== index));
   });
 
   /* ── Search ─────────────────────────────────────────────────────────────── */

@@ -20,6 +20,11 @@ health_check_interval: 60
 # Space-separated list of domain suffixes you own.
 # domain_groups: "example.com mysite.local"
 
+# Optional — markdown files shown as tabs in the Docs section (relative to this folder)
+# docs:
+#   - title: Overview
+#     path: README.md
+
 sections:
   - name: Infrastructure
     items:
@@ -27,6 +32,8 @@ sections:
         description: Manage your Docker environments
         icon: portainer.png          # place portainer.png in icons/
         url: http://192.168.1.10:9443
+        # Optional — directory containing README.md, added as a Docs tab
+        # docs: ./docs/portainer
 
       - title: Traefik
         description: Cloud-native reverse proxy
