@@ -3,9 +3,9 @@
 //   - Static assets (HTML, CSS, JS, icons): Cache First
 //   - /api/config: Network First with cache fallback
 
-const CACHE_NAME = 'dockboard-v1';
-const STATIC_CACHE = 'dockboard-static-v1';
-const API_CACHE = 'dockboard-api-v1';
+const CACHE_NAME = 'dockboard-v2';
+const STATIC_CACHE = 'dockboard-static-v2';
+const API_CACHE = 'dockboard-api-v2';
 
 const STATIC_ASSETS = [
   '/',

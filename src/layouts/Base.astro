@@ -4,7 +4,10 @@ interface Props {
   favicon?: string;
 }
 const { title = 'Dockboard', favicon } = Astro.props;
-const faviconSrc = favicon ? `/icons/${favicon}` : '/favicon.ico';
+const customIcon = favicon ? `/icons/${favicon}` : null;
+const svgIcon = customIcon ?? '/favicon.svg';
+const icoIcon = customIcon ?? '/favicon.ico';
+const touchIcon = customIcon && !customIcon.endsWith('.svg') ? customIcon : '/icons/app-icon-512.png';
 ---
 
 <!DOCTYPE html>
@@ -17,13 +20,14 @@ const faviconSrc = favicon ? `/icons/${favicon}` : '/favicon.ico';
 
     <title>{title}</title>
 
-    <!-- Favicon -->
-    <link rel="icon" href={faviconSrc} />
-    <link rel="shortcut icon" href={faviconSrc} />
+    <!-- Favicon: SVG for modern browsers, ICO fallback -->
+    <link rel="icon" type="image/svg+xml" href={svgIcon} />
+    <link rel="alternate icon" type="image/x-icon" href={icoIcon} />
+    <link rel="shortcut icon" type="image/x-icon" href={icoIcon} />
 
     <!-- PWA -->
     <link rel="manifest" href="/api/manifest" />
-    <link rel="apple-touch-icon" href={faviconSrc} />
+    <link rel="apple-touch-icon" href={touchIcon} />
 
     <!-- Preconnect for SimpleIcons CDN (icon fallback) -->
     <link rel="preconnect" href="https://cdn.simpleicons.org" crossorigin />
