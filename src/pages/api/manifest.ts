@@ -27,8 +27,9 @@ export const GET: APIRoute = async () => {
   } else {
     // Fallback icons if no icon is configured
     icons.push(
-      { src: '/app-icons/app-icon-192.png', sizes: '192x192', type: 'image/png' },
-      { src: '/app-icons/app-icon-512.png', sizes: '512x512', type: 'image/png' },
+      { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+      { src: '/icons/app-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: '/icons/app-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
     );
   }
 
